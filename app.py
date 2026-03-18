@@ -35,10 +35,10 @@ app = Flask(__name__, template_folder=str(TEMPLATE_DIR), static_folder=str(STATI
 
 database_url = os.environ.get("DATABASE_URL")
 if database_url:
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
+    database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 else:
     database_url = f"sqlite:///{BASE_DIR / 'licitacoes.db'}"
-
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao")
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
