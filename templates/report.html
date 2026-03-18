@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Relatório {{ tender.edital_number }}</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:24px;color:#111;background:#fff}
+    table{width:100%;border-collapse:collapse;margin-top:18px}
+    th,td{border:1px solid #d8dee9;padding:10px;font-size:12px;text-align:left;vertical-align:top}
+    h1,h2{margin:0 0 8px}
+    .muted{color:#555;margin-bottom:12px}.limit{color:#b91c1c;font-weight:700}.ok{color:#15803d}.warn{color:#b45309}.danger{color:#b91c1c}
+  </style>
+</head>
+<body>
+  <h1>Relatório da licitação {{ tender.edital_number }}</h1>
+  <div class="muted">Data da disputa: {{ tender.dispute_date.strftime('%d/%m/%Y') }} · Status: {{ tender.status }}</div>
+  <table>
+    <thead><tr><th>Item</th><th>Descrição</th><th>Referência</th><th>Custo máximo</th><th>Encontrado</th><th>Diferença</th><th>Status</th><th>Resultado</th></tr></thead>
+    <tbody>
+      {% for item in tender.items %}
+      <tr>
+        <td>{{ item.item_number }}</td>
+        <td>{{ item.description }}</td>
+        <td>{{ item.reference_value|currency }}</td>
+        <td class="limit">{{ item.max_cost_allowed|currency }}</td>
+        <td>{{ item.price_found|currency }}</td>
+        <td>{{ item.difference_to_limit|currency }}</td>
+        <td class="{% if item.price_status == 'success' %}ok{% elif item.price_status == 'warning' %}warn{% else %}danger{% endif %}">{{ item.viability_label }}</td>
+        <td>{{ item.result_status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <script>window.print()</script>
+</body>
+</html>

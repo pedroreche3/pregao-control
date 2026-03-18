@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}Licitações ganhas{% endblock %}
+{% block page_title %}Licitações ganhas{% endblock %}
+{% block content %}
+<div class="hero-panel mb-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div>
+      <div class="metric-label mb-2">Acompanhamento pós-disputa</div>
+      <h2 class="fw-bold mb-1">Controle das licitações ganhas</h2>
+      <div class="muted">Acompanhe habilitação, adjudicação e homologação em uma área só.</div>
+    </div>
+    <form class="d-flex gap-2 flex-wrap">
+      <select class="form-select" name="followup">
+        <option value="">Todos os status</option>
+        {% for s in won_followup_options %}
+          <option value="{{ s }}" {% if followup == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline-primary"><i class="bi bi-funnel"></i> Filtrar</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-4">
+  {% for tender in tenders %}
+    <div class="col-lg-6">
+      <div class="item-card">
+        <div class="d-flex justify-content-between gap-2 flex-wrap mb-3">
+          <div>
+            <div class="fw-bold fs-5">Edital {{ tender.edital_number }}</div>
+            <div class="muted">Disputa em {{ tender.dispute_date.strftime('%d/%m/%Y') }}</div>
+          </div>
+          {% if tender.won_status_badge == 'success' %}
+            <span class="badge-soft badge-success-soft"><i class="bi bi-patch-check-fill"></i> {{ tender.won_followup_status }}</span>
+          {% elif tender.won_status_badge == 'primary' %}
+            <span class="badge-soft badge-primary-soft"><i class="bi bi-arrow-repeat"></i> {{ tender.won_followup_status }}</span>
+          {% else %}
+            <span class="badge-soft badge-warning-soft"><i class="bi bi-hourglass-split"></i> {{ tender.won_followup_status or 'Em habilitação' }}</span>
+          {% endif %}
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6"><div class="mini-card"><div class="muted small">Itens ganhos</div><div class="value-big">{{ tender.won_items_count }}</div></div></div>
+          <div class="col-sm-6"><div class="mini-card"><div class="muted small">Status da licitação</div><div class="value-big text-success">{{ tender.status }}</div></div></div>
+        </div>
+        <form method="post" action="{{ url_for('update_won_tender', tender_id=tender.id) }}" class="d-grid gap-3">
+          <div><label class="form-label fw-semibold">Status de acompanhamento</label><select class="form-select" name="won_followup_status">{% for s in won_followup_options %}<option value="{{ s }}" {% if (tender.won_followup_status or 'Em habilitação') == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+          <div><label class="form-label fw-semibold">Observações</label><textarea class="form-control" name="won_notes" rows="3" placeholder="Situação atual, documento pendente, prazo, contato">{{ tender.won_notes }}</textarea></div>
+          <div class="d-flex gap-2 flex-wrap">
+            <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Salvar acompanhamento</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('tender_detail', tender_id=tender.id) }}"><i class="bi bi-list-task"></i> Abrir licitação</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  {% else %}
+    <div class="col-12"><div class="panel text-center py-5 muted">Nenhuma licitação marcada como ganha.</div></div>
+  {% endfor %}
+</div>
+{% endblock %}

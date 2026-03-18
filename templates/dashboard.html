@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+<div class="hero-panel mb-4">
+  <div class="row g-4 align-items-center">
+    <div class="col-lg-8">
+      <div class="metric-label mb-2">Resumo operacional</div>
+      <h2 class="fw-bold mb-2">Veja os valores importantes sem abrir várias telas</h2>
+      <div class="muted">O sistema foi ajustado para responder rápido: referência, encontrado, custo máximo e status visual em poucos cliques.</div>
+    </div>
+    <div class="col-lg-4">
+      <div class="copy-field">
+        <div>
+          <div class="metric-label">Regra principal</div>
+          <div class="copy-value">referência ÷ 2</div>
+        </div>
+        <i class="bi bi-calculator fs-1 text-primary"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-6 col-xl-3"><div class="card-soft metric-card"><div class="metric-label">Licitações</div><div class="metric-value">{{ total_tenders }}</div><div class="muted">Total cadastrado</div></div></div>
+  <div class="col-md-6 col-xl-3"><div class="card-soft metric-card"><div class="metric-label">Itens</div><div class="metric-value">{{ total_items }}</div><div class="muted">Base operacional</div></div></div>
+  <div class="col-md-6 col-xl-3"><div class="card-soft metric-card"><div class="metric-label">Licitações ganhas</div><div class="metric-value text-primary">{{ won_tenders_count }}</div><div class="muted">Em acompanhamento</div></div></div>
+  <div class="col-md-6 col-xl-3"><div class="card-soft metric-card"><div class="metric-label">Itens em risco</div><div class="metric-value text-danger">{{ risk_items }}</div><div class="muted">Acima do custo máximo</div></div></div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="panel mb-4">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+          <h3 class="section-title mb-1">Licitações próximas</h3>
+          <div class="muted">Abra direto no modo rápido ou no modo pregão.</div>
+        </div>
+        <form class="d-flex gap-2 flex-wrap">
+          <select class="form-select" name="status">
+            <option value="">Todos os status</option>
+            {% for s in status_options %}
+              <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-outline-primary">Filtrar</button>
+        </form>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Edital</th><th>Data</th><th>Status</th><th>Itens</th><th></th></tr></thead>
+          <tbody>
+          {% for tender in tenders %}
+            <tr>
+              <td class="fw-bold">{{ tender.edital_number }}</td>
+              <td>{{ tender.dispute_date.strftime('%d/%m/%Y') }}</td>
+              <td>
+                {% if tender.status == 'ganha' %}
+                  <span class="badge-soft badge-success-soft"><i class="bi bi-trophy-fill"></i> ganha</span>
+                {% elif tender.status == 'perdida' %}
+                  <span class="badge-soft badge-danger-soft"><i class="bi bi-x-circle-fill"></i> perdida</span>
+                {% else %}
+                  <span class="badge-soft badge-secondary-soft"><i class="bi bi-circle-fill"></i> {{ tender.status }}</span>
+                {% endif %}
+              </td>
+              <td>{{ tender.items|length }}</td>
+              <td class="text-end d-flex gap-2 justify-content-end flex-wrap">
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('tender_detail', tender_id=tender.id) }}"><i class="bi bi-list-task"></i> Itens</a>
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('quick_mode', tender_id=tender.id) }}"><i class="bi bi-speedometer2"></i> Rápido</a>
+                <a class="btn btn-sm btn-dark" href="{{ url_for('pregao_mode', tender_id=tender.id) }}"><i class="bi bi-broadcast-pin"></i> Pregão</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="text-center py-5 muted">Nenhuma licitação cadastrada.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+          <h3 class="section-title mb-1">Itens prontos para uso rápido</h3>
+          <div class="muted">Bate o olho e veja imediatamente até quanto pode ir.</div>
+        </div>
+      </div>
+      <div class="row g-3">
+        {% for item in quick_items %}
+          <div class="col-md-6">
+            <div class="item-card">
+              <div class="d-flex justify-content-between gap-2 mb-2">
+                <div>
+                  <div class="fw-bold">{{ item.tender.edital_number }} · Item {{ item.item_number }}</div>
+                  <div class="muted small">{{ item.description[:70] }}{% if item.description|length > 70 %}...{% endif %}</div>
+                </div>
+                {% if item.price_status == 'success' %}
+                  <span class="badge-soft badge-success-soft">Viável</span>
+                {% elif item.price_status == 'warning' %}
+                  <span class="badge-soft badge-warning-soft">No limite</span>
+                {% elif item.price_status == 'danger' %}
+                  <span class="badge-soft badge-danger-soft">Não viável</span>
+                {% else %}
+                  <span class="badge-soft badge-secondary-soft">Sem dados</span>
+                {% endif %}
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-6"><div class="mini-card"><div class="muted small">Referência</div><div class="fw-bold">{{ item.reference_value|currency }}</div></div></div>
+                <div class="col-6"><div class="mini-card"><div class="muted small">Encontrado</div><div class="fw-bold">{{ item.price_found|currency }}</div></div></div>
+              </div>
+              <div class="copy-field">
+                <div>
+                  <div class="metric-label">Até quanto posso ir</div>
+                  <div class="copy-value text-danger">{{ item.quick_value|currency }}</div>
+                </div>
+                <button class="btn btn-primary quick-copy" type="button" onclick="copyText('{{ '%.4f'|format(item.quick_value) }}')"><i class="bi bi-copy"></i> Copiar</button>
+              </div>
+            </div>
+          </div>
+        {% else %}
+          <div class="col-12"><div class="muted">Cadastre itens para aparecerem aqui.</div></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="panel mb-4">
+      <div class="metric-label">Lucro potencial estimado</div>
+      <div class="metric-value">{{ potential_profit|currency }}</div>
+      <div class="muted">Soma de referência menos valor encontrado nos itens preenchidos.</div>
+    </div>
+    <div class="panel mb-4">
+      <h4 class="section-title mb-3">Próximas disputas</h4>
+      <div class="list-clean">
+        {% for tender in upcoming %}
+          <a href="{{ url_for('quick_mode', tender_id=tender.id) }}" class="mini-card d-block">
+            <div class="fw-bold">{{ tender.edital_number }}</div>
+            <div class="muted">{{ tender.dispute_date.strftime('%d/%m/%Y') }} · {{ tender.status }}</div>
+          </a>
+        {% else %}
+          <div class="muted">Sem licitações futuras.</div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="panel">
+      <h4 class="section-title mb-3">Últimas atividades</h4>
+      <div class="list-clean">
+        {% for bid in recent_bids %}
+          <div class="mini-card">
+            <div class="fw-bold">{{ bid.item.tender.edital_number }} · Item {{ bid.item.item_number }}</div>
+            <div>{{ bid.bid_value|currency }}</div>
+            <div class="muted">{{ bid.created_at.strftime('%d/%m/%Y %H:%M') }}{% if bid.note %} · {{ bid.note }}{% endif %}</div>
+          </div>
+        {% else %}
+          <div class="muted">Nenhum lance registrado ainda.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

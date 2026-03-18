@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Login · LicitaPro{% endblock %}
+{% block auth_content %}
+<div class="container py-5">
+  <div class="row justify-content-center align-items-center min-vh-100">
+    <div class="col-lg-5">
+      <div class="panel p-4 p-lg-5">
+        <div class="text-center mb-4">
+          <div class="brand-mark mx-auto mb-3"><i class="bi bi-lightning-charge-fill"></i></div>
+          <h1 class="fw-bold">LicitaPro</h1>
+          <p class="muted mb-0">Entre no sistema e opere seus pregões com rapidez.</p>
+        </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}<div class="alert alert-{{ category }}">{{ message }}</div>{% endfor %}
+          {% endif %}
+        {% endwith %}
+        <form method="post" class="d-grid gap-3">
+          <div>
+            <label class="form-label fw-semibold">E-mail</label>
+            <input class="form-control form-control-lg" type="email" name="email" value="admin@licitacao.local" required>
+          </div>
+          <div>
+            <label class="form-label fw-semibold">Senha</label>
+            <input class="form-control form-control-lg" type="password" name="password" value="admin123" required>
+          </div>
+          <button class="btn btn-primary btn-xl"><i class="bi bi-box-arrow-in-right"></i> Entrar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

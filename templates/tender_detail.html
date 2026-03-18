@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+{% block title %}Licitação {{ tender.edital_number }}{% endblock %}
+{% block page_title %}Itens da licitação{% endblock %}
+{% block content %}
+<div class="hero-panel mb-4">
+  <div class="d-flex justify-content-between flex-wrap gap-3 align-items-start">
+    <div>
+      <div class="metric-label mb-2">Licitação</div>
+      <h1 class="fw-bold mb-1">Edital {{ tender.edital_number }}</h1>
+      <div class="muted">Disputa: {{ tender.dispute_date.strftime('%d/%m/%Y') }} · Status: {{ tender.status }}</div>
+      {% if tender.status == 'ganha' %}
+        <div class="mt-2"><span class="badge-soft badge-success-soft"><i class="bi bi-trophy-fill"></i> {{ tender.won_followup_status or 'Em habilitação' }}</span></div>
+      {% endif %}
+    </div>
+    <div class="d-flex flex-wrap gap-2 mobile-actions">
+      <a class="btn btn-outline-secondary" href="{{ url_for('quick_mode', tender_id=tender.id) }}"><i class="bi bi-speedometer2"></i> Modo rápido</a>
+      <a class="btn btn-dark" href="{{ url_for('pregao_mode', tender_id=tender.id) }}"><i class="bi bi-display"></i> Modo pregão</a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-4">
+    <div class="panel right-rail mb-4">
+      <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+        <h4 class="section-title">Dados da licitação</h4>
+        <form method="post" action="{{ url_for('delete_tender', tender_id=tender.id) }}" onsubmit="return confirm('Excluir a licitação {{ tender.edital_number }} e todos os itens vinculados?');">
+          <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i> Excluir</button>
+        </form>
+      </div>
+      <form method="post" action="{{ url_for('update_tender', tender_id=tender.id) }}" class="d-grid gap-3">
+        <input class="form-control" name="edital_number" value="{{ tender.edital_number }}">
+        <input class="form-control" type="date" name="dispute_date" value="{{ tender.dispute_date.isoformat() }}">
+        <select class="form-select" name="status">
+          {% for s in status_options %}
+            <option value="{{ s }}" {% if tender.status == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+        <select class="form-select" name="won_followup_status">
+          <option value="">Status da licitação ganha</option>
+          {% for s in won_followup_options %}
+            <option value="{{ s }}" {% if tender.won_followup_status == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+        <textarea class="form-control" name="notes" rows="3" placeholder="Observações gerais">{{ tender.notes }}</textarea>
+        <textarea class="form-control" name="won_notes" rows="3" placeholder="Observações do acompanhamento da licitação ganha">{{ tender.won_notes }}</textarea>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-primary flex-grow-1"><i class="bi bi-check2-circle"></i> Salvar dados</button>
+          <a class="btn btn-outline-secondary" href="{{ url_for('quick_mode', tender_id=tender.id) }}"><i class="bi bi-speedometer2"></i> Rápido</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel mb-4">
+      <h4 class="section-title mb-3">Anexar edital</h4>
+      <form method="post" enctype="multipart/form-data" action="{{ url_for('upload_attachment', tender_id=tender.id) }}" class="d-grid gap-3">
+        <input class="form-control" type="file" name="attachment" required>
+        <button class="btn btn-outline-primary"><i class="bi bi-paperclip"></i> Enviar arquivo</button>
+      </form>
+      <div class="list-clean mt-3">
+        {% for file in tender.attachments %}
+          <a class="mini-card d-block" target="_blank" href="{{ url_for('static', filename='uploads/' ~ file.file_name) }}"><i class="bi bi-file-earmark"></i> {{ file.original_name }}</a>
+        {% else %}
+          <div class="muted">Nenhum arquivo anexado.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <h4 class="section-title mb-3">Novo item</h4>
+      <form method="post" class="d-grid gap-3">
+        <div class="row g-3">
+          <div class="col-6"><label class="form-label fw-semibold">Item/lote</label><input class="form-control" name="item_number" required></div>
+          <div class="col-6"><label class="form-label fw-semibold">Quantidade</label><input class="form-control" name="quantity" type="number" step="0.0001" value="1"></div>
+        </div>
+        <div><label class="form-label fw-semibold">Descrição</label><textarea class="form-control" name="description" rows="3" required></textarea></div>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label fw-semibold">Valor de referência</label><input class="form-control" name="reference_value" type="number" step="0.0001"></div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Valor encontrado</label><input class="form-control" name="price_found" type="number" step="0.0001"></div>
+        </div>
+        <div><label class="form-label fw-semibold">Fornecedor</label><select class="form-select" name="supplier_id"><option value="">Selecionar fornecedor (opcional)</option>{% for supplier in suppliers %}<option value="{{ supplier.id }}">{{ supplier.name }}</option>{% endfor %}</select></div>
+        <div><label class="form-label fw-semibold">Link do fornecedor</label><input class="form-control" name="product_link" placeholder="https://..."></div>
+        <div><label class="form-label fw-semibold">Observação</label><textarea class="form-control" name="quick_notes" rows="2" placeholder="Atende, frete, prazo, garantia"></textarea></div>
+        <button class="btn btn-primary btn-xl"><i class="bi bi-plus-circle"></i> Adicionar item</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-xl-8">
+    <div class="panel mb-4">
+      <div class="d-flex justify-content-between flex-wrap gap-3 align-items-center mb-3">
+        <div>
+          <h4 class="section-title mb-1">Leitura rápida por item</h4>
+          <div class="muted">Abra, veja o valor, copie o limite e pronto.</div>
+        </div>
+        <form class="d-flex gap-2 flex-wrap">
+          <input class="form-control" name="search" value="{{ search }}" placeholder="Buscar item ou descrição">
+          <select class="form-select" name="viability">
+            <option value="">Todos</option>
+            <option value="success" {% if viability_filter == 'success' %}selected{% endif %}>Viável</option>
+            <option value="warning" {% if viability_filter == 'warning' %}selected{% endif %}>No limite</option>
+            <option value="danger" {% if viability_filter == 'danger' %}selected{% endif %}>Não viável</option>
+          </select>
+          <select class="form-select" name="result">
+            <option value="">Todos os resultados</option>
+            {% for s in item_result_options %}<option value="{{ s }}" {% if result_filter == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select>
+          <button class="btn btn-outline-primary"><i class="bi bi-funnel"></i> Filtrar</button>
+        </form>
+      </div>
+
+      {% if selected_quick_item %}
+      <div class="quick-panel mb-4">
+        <div class="d-flex justify-content-between gap-3 flex-wrap mb-3">
+          <div>
+            <div class="metric-label">Item selecionado</div>
+            <div class="fs-3 fw-bold">{{ selected_quick_item.item_number }}</div>
+            <div class="muted">{{ selected_quick_item.description }}</div>
+          </div>
+          <div>
+            {% if selected_quick_item.price_status == 'success' %}
+              <span class="status-pill badge-success-soft"><i class="bi bi-check-circle-fill"></i> Viável</span>
+            {% elif selected_quick_item.price_status == 'warning' %}
+              <span class="status-pill badge-warning-soft"><i class="bi bi-exclamation-triangle-fill"></i> No limite</span>
+            {% elif selected_quick_item.price_status == 'danger' %}
+              <span class="status-pill badge-danger-soft"><i class="bi bi-x-circle-fill"></i> Não viável</span>
+            {% else %}
+              <span class="status-pill badge-secondary-soft"><i class="bi bi-dash-circle-fill"></i> Sem dados</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="quick-grid mb-3">
+          <div class="focus-box"><div class="metric-label">Valor de referência</div><div class="value-big">{{ selected_quick_item.reference_value|currency }}</div></div>
+          <div class="focus-box focus-danger"><div class="metric-label">Até quanto posso ir</div><div class="value-huge value-limit">{{ selected_quick_item.quick_value|currency }}</div></div>
+          <div class="focus-box focus-brand"><div class="metric-label">Valor encontrado</div><div class="value-big">{{ selected_quick_item.price_found|currency }}</div></div>
+        </div>
+        <div class="copy-field">
+          <div>
+            <div class="metric-label">Valor pronto para copiar</div>
+            <div class="copy-value text-danger">{{ selected_quick_item.quick_value|currency }}</div>
+          </div>
+          <button class="btn btn-primary quick-copy" type="button" onclick="copyText('{{ '%.4f'|format(selected_quick_item.quick_value) }}')"><i class="bi bi-copy"></i> Copiar valor</button>
+        </div>
+      </div>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('bulk_delete_items', tender_id=tender.id) }}" onsubmit="return confirm('Excluir os itens selecionados?');">
+        <div class="d-flex justify-content-end mb-3"><button class="btn btn-outline-danger"><i class="bi bi-trash3"></i> Excluir selecionados</button></div>
+        <div class="row g-3">
+          {% for item in items %}
+            <div class="col-12">
+              <div class="item-card {% if selected_quick_item and selected_quick_item.id == item.id %}active{% endif %}">
+                <div class="d-flex justify-content-between gap-3 flex-wrap mb-3">
+                  <div class="d-flex gap-3 align-items-start">
+                    <input class="select-row mt-1" type="checkbox" name="item_ids" value="{{ item.id }}">
+                    <div>
+                      <div class="fw-bold fs-5">Item {{ item.item_number }}</div>
+                      <div class="muted">{{ item.description }}</div>
+                    </div>
+                  </div>
+                  <div class="d-flex gap-2 flex-wrap align-items-start justify-content-end">
+                    {% if item.price_status == 'success' %}
+                      <span class="badge-soft badge-success-soft"><i class="bi bi-check-circle-fill"></i> Viável</span>
+                    {% elif item.price_status == 'warning' %}
+                      <span class="badge-soft badge-warning-soft"><i class="bi bi-exclamation-triangle-fill"></i> No limite</span>
+                    {% elif item.price_status == 'danger' %}
+                      <span class="badge-soft badge-danger-soft"><i class="bi bi-x-circle-fill"></i> Não viável</span>
+                    {% else %}
+                      <span class="badge-soft badge-secondary-soft"><i class="bi bi-dash-circle-fill"></i> Sem dados</span>
+                    {% endif %}
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('tender_detail', tender_id=tender.id, quick_item_id=item.id) }}"><i class="bi bi-eye"></i> Foco</a>
+                    <a class="btn btn-sm btn-dark" href="{{ url_for('quick_mode', tender_id=tender.id, item_id=item.id) }}"><i class="bi bi-speedometer2"></i> Rápido</a>
+                  </div>
+                </div>
+                <div class="row g-3 mb-3">
+                  <div class="col-md-3"><div class="mini-card"><div class="metric-label">Referência</div><div class="fw-bold">{{ item.reference_value|currency }}</div></div></div>
+                  <div class="col-md-3"><div class="mini-card"><div class="metric-label">Encontrado</div><div class="fw-bold">{{ item.price_found|currency }}</div></div></div>
+                  <div class="col-md-3"><div class="mini-card"><div class="metric-label">Custo máximo</div><div class="fw-bold text-danger">{{ item.max_cost_allowed|currency }}</div></div></div>
+                  <div class="col-md-3"><div class="mini-card"><div class="metric-label">Diferença</div><div class="fw-bold {% if item.difference_to_limit < 0 %}text-danger{% elif item.price_status == 'warning' %}text-warning{% else %}text-success{% endif %}">{{ item.difference_to_limit|currency }}</div></div></div>
+                </div>
+                <div class="copy-field mb-3">
+                  <div>
+                    <div class="metric-label">Até quanto posso ir</div>
+                    <div class="copy-value text-danger">{{ item.quick_value|currency }}</div>
+                  </div>
+                  <button class="btn btn-primary quick-copy" type="button" onclick="copyText('{{ '%.4f'|format(item.quick_value) }}')"><i class="bi bi-copy"></i> Copiar</button>
+                </div>
+                <div class="row g-3 align-items-start">
+                  <div class="col-md-7">
+                    <div class="compact-line"><span class="muted">Fornecedor</span><strong>{{ item.supplier_name }}</strong></div>
+                    <div class="compact-line"><span class="muted">Link</span>{% if item.product_link %}<a href="{{ item.product_link }}" target="_blank">Abrir fornecedor</a>{% else %}<span>Não informado</span>{% endif %}</div>
+                    <div class="compact-line"><span class="muted">Observação</span><span>{{ item.quick_notes or 'Sem observações.' }}</span></div>
+                  </div>
+                  <div class="col-md-5">
+                    <div class="d-flex gap-2 flex-wrap justify-content-md-end">
+                      <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editItem{{ item.id }}"><i class="bi bi-pencil-square"></i> Editar</button>
+                      <form method="post" action="{{ url_for('duplicate_item', item_id=item.id) }}"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-copy"></i> Duplicar</button></form>
+                      <form method="post" action="{{ url_for('delete_item', item_id=item.id) }}" onsubmit="return confirm('Excluir o item {{ item.item_number }}?');"><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i> Excluir</button></form>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal fade" id="editItem{{ item.id }}" tabindex="-1">
+              <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content" style="border-radius:24px">
+                  <div class="modal-header border-0"><h5 class="modal-title fw-bold">Editar item {{ item.item_number }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+                  <div class="modal-body">
+                    <form method="post" action="{{ url_for('update_item', item_id=item.id) }}" class="d-grid gap-3">
+                      <div class="row g-3">
+                        <div class="col-md-4"><label class="form-label fw-semibold">Item</label><input class="form-control" name="item_number" value="{{ item.item_number }}"></div>
+                        <div class="col-md-4"><label class="form-label fw-semibold">Quantidade</label><input class="form-control" name="quantity" type="number" step="0.0001" value="{{ item.quantity }}"></div>
+                        <div class="col-md-4"><label class="form-label fw-semibold">Fornecedor</label><select class="form-select" name="supplier_id"><option value="">Sem fornecedor</option>{% for supplier in suppliers %}<option value="{{ supplier.id }}" {% if item.supplier_id == supplier.id %}selected{% endif %}>{{ supplier.name }}</option>{% endfor %}</select></div>
+                      </div>
+                      <div><label class="form-label fw-semibold">Descrição</label><textarea class="form-control" name="description" rows="3">{{ item.description }}</textarea></div>
+                      <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label fw-semibold">Valor de referência</label><input class="form-control" name="reference_value" type="number" step="0.0001" value="{{ item.reference_value }}"></div>
+                        <div class="col-md-6"><label class="form-label fw-semibold">Valor encontrado</label><input class="form-control" name="price_found" type="number" step="0.0001" value="{{ item.price_found }}"></div>
+                      </div>
+                      <div class="copy-field"><div><div class="metric-label">Até quanto posso ir</div><div class="copy-value text-danger">{{ item.quick_value|currency }}</div></div><button class="btn btn-outline-primary" type="button" onclick="copyText('{{ '%.4f'|format(item.quick_value) }}')">Copiar</button></div>
+                      <div class="row g-3">
+                        <div class="col-md-8"><label class="form-label fw-semibold">Link do fornecedor</label><input class="form-control" name="product_link" value="{{ item.product_link }}"></div>
+                        <div class="col-md-4"><label class="form-label fw-semibold">Resultado</label><select class="form-select" name="result_status">{% for s in item_result_options %}<option value="{{ s }}" {% if item.result_status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+                      </div>
+                      <div><label class="form-label fw-semibold">Observação</label><textarea class="form-control" name="quick_notes" rows="3">{{ item.quick_notes }}</textarea></div>
+                      <button class="btn btn-primary"><i class="bi bi-check2-circle"></i> Salvar item</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% else %}
+            <div class="col-12"><div class="panel text-center py-5 muted">Nenhum item cadastrado.</div></div>
+          {% endfor %}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

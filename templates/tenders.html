@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}Licitações{% endblock %}
+{% block page_title %}Licitações{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-xl-4">
+    <div class="panel right-rail">
+      <h3 class="section-title mb-3">Nova licitação</h3>
+      <form method="post" class="d-grid gap-3">
+        <div><label class="form-label fw-semibold">Nº do edital</label><input class="form-control" name="edital_number" required></div>
+        <div><label class="form-label fw-semibold">Data da disputa</label><input class="form-control" type="date" name="dispute_date" required></div>
+        <div><label class="form-label fw-semibold">Status</label><select class="form-select" name="status">{% for s in status_options %}<option>{{ s }}</option>{% endfor %}</select></div>
+        <div><label class="form-label fw-semibold">Observações</label><textarea class="form-control" name="notes" rows="4"></textarea></div>
+        <button class="btn btn-primary btn-xl"><i class="bi bi-plus-circle"></i> Salvar licitação</button>
+      </form>
+    </div>
+  </div>
+  <div class="col-xl-8">
+    <div class="panel">
+      <div class="d-flex justify-content-between flex-wrap gap-2 align-items-center mb-3">
+        <div>
+          <h3 class="section-title mb-1">Licitações cadastradas</h3>
+          <div class="muted">Abra direto no modo rápido, acompanhe as ganhas ou exclua em lote.</div>
+        </div>
+        <form class="d-flex gap-2 flex-wrap">
+          <input class="form-control" name="search" value="{{ search }}" placeholder="Buscar por edital">
+          <select class="form-select" name="status">
+            <option value="">Todos</option>
+            {% for s in status_options %}
+              <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-outline-primary">Filtrar</button>
+        </form>
+      </div>
+
+      <form method="post" action="{{ url_for('bulk_delete_tenders') }}" onsubmit="return confirm('Excluir as licitações selecionadas? Todos os itens vinculados também serão apagados.');">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <a class="btn btn-outline-success" href="{{ url_for('won_tenders') }}"><i class="bi bi-trophy"></i> Licitações ganhas</a>
+          <button class="btn btn-outline-danger"><i class="bi bi-trash3"></i> Excluir selecionadas</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead><tr><th><input type="checkbox" id="checkAllTenders"></th><th>Edital</th><th>Disputa</th><th>Status</th><th>Itens</th><th></th></tr></thead>
+            <tbody>
+            {% for tender in tenders %}
+              <tr>
+                <td><input class="select-row" type="checkbox" name="tender_ids" value="{{ tender.id }}"></td>
+                <td class="fw-bold">{{ tender.edital_number }}</td>
+                <td>{{ tender.dispute_date.strftime('%d/%m/%Y') }}</td>
+                <td>
+                  {% if tender.status == 'ganha' %}
+                    <span class="badge-soft badge-success-soft"><i class="bi bi-trophy-fill"></i> ganha</span>
+                  {% elif tender.status == 'perdida' %}
+                    <span class="badge-soft badge-danger-soft"><i class="bi bi-x-circle-fill"></i> perdida</span>
+                  {% else %}
+                    <span class="badge-soft badge-secondary-soft">{{ tender.status }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ tender.items|length }}</td>
+                <td class="text-end d-flex gap-2 justify-content-end flex-wrap">
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('tender_detail', tender_id=tender.id) }}"><i class="bi bi-list-task"></i> Itens</a>
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('quick_mode', tender_id=tender.id) }}"><i class="bi bi-speedometer2"></i> Rápido</a>
+                  <a class="btn btn-sm btn-dark" href="{{ url_for('pregao_mode', tender_id=tender.id) }}"><i class="bi bi-lightning-charge"></i> Pregão</a>
+                  <form method="post" action="{{ url_for('delete_tender', tender_id=tender.id) }}" onsubmit="return confirm('Excluir a licitação {{ tender.edital_number }} e todos os itens vinculados?');">
+                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i></button>
+                  </form>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td colspan="6" class="text-center py-5 muted">Nenhuma licitação encontrada.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+  document.getElementById('checkAllTenders')?.addEventListener('change', function(){
+    document.querySelectorAll('input[name="tender_ids"]').forEach(cb => cb.checked = this.checked);
+  });
+</script>
+{% endblock %}

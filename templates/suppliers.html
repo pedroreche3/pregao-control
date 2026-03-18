@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Fornecedores{% endblock %}
+{% block page_title %}Fornecedores{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-xl-4">
+    <div class="panel sticky-tools">
+      <h3 class="fw-bold mb-3">Cadastro rápido de fornecedor</h3>
+      <form method="post" class="d-grid gap-3">
+        <input class="form-control" name="name" placeholder="Nome do fornecedor" required>
+        <input class="form-control" name="product_link" placeholder="Link do produto">
+        <input class="form-control" name="price_found" type="number" step="0.0001" placeholder="Preço encontrado">
+        <textarea class="form-control" name="notes" rows="4" placeholder="Observações"></textarea>
+        <button class="btn btn-primary btn-xl"><i class="bi bi-plus-circle"></i> Salvar fornecedor</button>
+      </form>
+    </div>
+  </div>
+  <div class="col-xl-8">
+    <div class="panel">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+          <h3 class="fw-bold mb-1">Fornecedores</h3>
+          <div class="muted">Base de apoio para preencher itens mais rápido.</div>
+        </div>
+        <form class="d-flex gap-2"><input class="form-control" name="search" value="{{ search }}" placeholder="Buscar fornecedor"><button class="btn btn-outline-primary"><i class="bi bi-search"></i> Buscar</button></form>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Nome</th><th>Preço</th><th>Link</th><th>Observações</th></tr></thead>
+          <tbody>
+          {% for supplier in suppliers %}
+            <tr><td class="fw-bold">{{ supplier.name }}</td><td>{{ supplier.price_found|currency }}</td><td>{% if supplier.product_link %}<a href="{{ supplier.product_link }}" target="_blank">Abrir</a>{% else %}<span class="muted">-</span>{% endif %}</td><td>{{ supplier.notes }}</td></tr>
+          {% else %}
+            <tr><td colspan="4" class="text-center py-5 muted">Nenhum fornecedor cadastrado.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

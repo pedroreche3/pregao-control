@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}Modo rápido{% endblock %}
+{% block page_title %}Modo rápido{% endblock %}
+{% block content %}
+<div class="hero-panel mb-4">
+  <div class="d-flex justify-content-between flex-wrap gap-3 align-items-center">
+    <div>
+      <div class="metric-label mb-2">Uso operacional</div>
+      <h2 class="fw-bold mb-1">Abra, veja o valor e copie</h2>
+      <div class="muted">Esse modo reduz o excesso e deixa só o essencial na tela.</div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-outline-primary" href="{{ url_for('tender_detail', tender_id=tender.id) }}"><i class="bi bi-list-task"></i> Itens</a>
+      <a class="btn btn-dark" href="{{ url_for('pregao_mode', tender_id=tender.id, item_id=selected_item.id if selected_item else None) }}"><i class="bi bi-display"></i> Modo pregão</a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-4">
+    <div class="panel right-rail">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="section-title mb-0">Itens</h4>
+        <span class="badge-soft badge-secondary-soft">{{ items|length }}</span>
+      </div>
+      <div class="list-clean">
+        {% for item in items %}
+          <a href="{{ url_for('quick_mode', tender_id=tender.id, item_id=item.id) }}" class="item-card d-block {% if selected_item and selected_item.id == item.id %}active{% endif %}">
+            <div class="d-flex justify-content-between gap-2 mb-2">
+              <div class="fw-bold">Item {{ item.item_number }}</div>
+              {% if item.price_status == 'success' %}
+                <span class="badge-soft badge-success-soft">Viável</span>
+              {% elif item.price_status == 'warning' %}
+                <span class="badge-soft badge-warning-soft">No limite</span>
+              {% elif item.price_status == 'danger' %}
+                <span class="badge-soft badge-danger-soft">Não viável</span>
+              {% else %}
+                <span class="badge-soft badge-secondary-soft">Sem dados</span>
+              {% endif %}
+            </div>
+            <div class="muted small mb-2">{{ item.description[:70] }}{% if item.description|length > 70 %}...{% endif %}</div>
+            <div class="text-danger fw-bold">{{ item.quick_value|currency }}</div>
+          </a>
+        {% else %}
+          <div class="muted">Cadastre itens para usar o modo rápido.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-8">
+    {% if selected_item %}
+    <div class="quick-panel">
+      <div class="quick-main">
+        <div class="d-flex justify-content-between gap-3 flex-wrap align-items-start">
+          <div>
+            <div class="metric-label">Item {{ selected_item.item_number }}</div>
+            <div class="fs-4 fw-bold mb-1">{{ selected_item.description }}</div>
+            <div class="muted">Quantidade: {{ selected_item.quantity }}</div>
+          </div>
+          <button class="btn btn-primary quick-copy" type="button" onclick="copyText('{{ '%.4f'|format(selected_item.quick_value) }}')"><i class="bi bi-copy"></i> Copiar valor</button>
+        </div>
+
+        <div class="quick-grid">
+          <div class="focus-box"><div class="metric-label">Valor de referência</div><div class="value-big">{{ selected_item.reference_value|currency }}</div></div>
+          <div class="focus-box focus-danger"><div class="metric-label">Até quanto posso ir</div><div class="value-huge value-limit">{{ selected_item.quick_value|currency }}</div></div>
+          <div class="focus-box focus-brand"><div class="metric-label">Valor encontrado</div><div class="value-big">{{ selected_item.price_found|currency }}</div></div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="mini-card h-100">
+              <div class="metric-label mb-2">Status visual</div>
+              {% if selected_item.price_status == 'success' %}
+                <div class="value-big text-success mb-2">Pode ir</div>
+                <div class="muted">O valor encontrado está abaixo do custo máximo permitido.</div>
+              {% elif selected_item.price_status == 'warning' %}
+                <div class="value-big text-warning mb-2">Atenção</div>
+                <div class="muted">Está muito próximo do limite. Revise antes de continuar.</div>
+              {% elif selected_item.price_status == 'danger' %}
+                <div class="value-big text-danger mb-2">Não vale a pena</div>
+                <div class="muted">O valor encontrado já passou do limite para 100% de lucro.</div>
+              {% else %}
+                <div class="value-big mb-2">Sem dados</div>
+                <div class="muted">Preencha referência e valor encontrado.</div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="mini-card h-100">
+              <div class="metric-label mb-2">Resumo do item</div>
+              <div class="compact-line"><span class="muted">Diferença</span><strong class="{% if selected_item.difference_to_limit < 0 %}text-danger{% elif selected_item.price_status == 'warning' %}text-warning{% else %}text-success{% endif %}">{{ selected_item.difference_to_limit|currency }}</strong></div>
+              <div class="compact-line"><span class="muted">Fornecedor</span><strong>{{ selected_item.supplier_name }}</strong></div>
+              <div class="compact-line"><span class="muted">Link</span>{% if selected_item.product_link %}<a href="{{ selected_item.product_link }}" target="_blank">Abrir</a>{% else %}<span>Não informado</span>{% endif %}</div>
+              <div class="compact-line"><span class="muted">Observação</span><span>{{ selected_item.quick_notes or 'Sem observações.' }}</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="d-flex justify-content-between gap-2 flex-wrap align-items-center mb-3">
+            <h4 class="section-title mb-0">Ações rápidas</h4>
+            <div class="d-flex gap-2 flex-wrap">
+              <a class="btn btn-outline-secondary" href="{{ url_for('tender_detail', tender_id=tender.id, quick_item_id=selected_item.id) }}"><i class="bi bi-pencil-square"></i> Editar item</a>
+              <a class="btn btn-outline-primary" href="{{ url_for('item_history', item_id=selected_item.id) }}"><i class="bi bi-clock-history"></i> Histórico</a>
+            </div>
+          </div>
+          <form method="post" action="{{ url_for('register_bid', item_id=selected_item.id) }}" class="row g-3 align-items-end">
+            <input type="hidden" name="origin" value="quick">
+            <div class="col-md-5"><label class="form-label fw-semibold">Registrar lance</label><input class="form-control form-control-lg" name="bid_value" type="number" step="0.0001" value="{{ selected_item.last_bid if selected_item.last_bid is not none else selected_item.quick_value }}"></div>
+            <div class="col-md-4"><label class="form-label fw-semibold">Observação</label><input class="form-control" name="note"></div>
+            <div class="col-md-3"><button class="btn btn-primary btn-xl w-100"><i class="bi bi-lightning-charge"></i> Salvar</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% else %}
+      <div class="panel text-center py-5 muted">Cadastre itens para usar o modo rápido.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
