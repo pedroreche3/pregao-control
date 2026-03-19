@@ -39,6 +39,7 @@ if database_url:
     database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 else:
     database_url = f"sqlite:///{BASE_DIR / 'licitacoes.db'}"
+
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao")
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -199,6 +200,24 @@ def currency(value: float | None) -> str:
     return f"R$ {value:,.4f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def parse_int(value, default=None):
+    try:
+        if value is None or str(value).strip() == "":
+            return default
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_float(value, default=0.0):
+    try:
+        if value is None or str(value).strip() == "":
+            return default
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+
+
 app.jinja_env.filters["currency"] = currency
 
 
@@ -324,9 +343,26 @@ def dashboard():
 @login_required
 def tenders():
     if request.method == "POST":
+        dispute_date_str = request.form.get("dispute_date", "").strip()
+        edital_number = request.form.get("edital_number", "").strip()
+
+        if not edital_number:
+            flash("Informe o número do edital.", "warning")
+            return redirect(url_for("tenders"))
+
+        if not dispute_date_str:
+            flash("Informe a data da disputa.", "warning")
+            return redirect(url_for("tenders"))
+
+        try:
+            dispute_date = datetime.strptime(dispute_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            flash("Data da disputa inválida.", "danger")
+            return redirect(url_for("tenders"))
+
         tender = Tender(
-            edital_number=request.form.get("edital_number", "").strip(),
-            dispute_date=datetime.strptime(request.form.get("dispute_date"), "%Y-%m-%d").date(),
+            edital_number=edital_number,
+            dispute_date=dispute_date,
             status=request.form.get("status", "em andamento"),
             notes=request.form.get("notes", "").strip(),
             won_notes=request.form.get("won_notes", "").strip(),
@@ -352,15 +388,30 @@ def tenders():
 @login_required
 def tender_detail(tender_id: int):
     tender = Tender.query.get_or_404(tender_id)
+
     if request.method == "POST":
+        supplier_id_raw = request.form.get("supplier_id", "").strip()
+        supplier_id = parse_int(supplier_id_raw, None)
+
+        item_number = request.form.get("item_number", "").strip()
+        description = request.form.get("description", "").strip()
+
+        if not item_number:
+            flash("Informe o número do item.", "warning")
+            return redirect(url_for("tender_detail", tender_id=tender.id))
+
+        if not description:
+            flash("Informe a descrição do item.", "warning")
+            return redirect(url_for("tender_detail", tender_id=tender.id))
+
         item = Item(
             tender_id=tender.id,
-            supplier_id=request.form.get("supplier_id") or None,
-            item_number=request.form.get("item_number", "").strip(),
-            description=request.form.get("description", "").strip(),
-            quantity=float(request.form.get("quantity") or 1),
-            reference_value=float(request.form.get("reference_value") or 0),
-            price_found=float(request.form.get("price_found") or 0),
+            supplier_id=supplier_id,
+            item_number=item_number,
+            description=description,
+            quantity=parse_float(request.form.get("quantity"), 1),
+            reference_value=parse_float(request.form.get("reference_value"), 0),
+            price_found=parse_float(request.form.get("price_found"), 0),
             product_link=request.form.get("product_link", "").strip(),
             quick_notes=request.form.get("quick_notes", "").strip(),
         )
@@ -373,21 +424,27 @@ def tender_detail(tender_id: int):
     viability_filter = request.args.get("viability", "").strip()
     result_filter = request.args.get("result", "").strip()
     items_query = Item.query.filter_by(tender_id=tender.id)
+
     if search:
         items_query = items_query.filter(
             or_(Item.description.ilike(f"%{search}%"), Item.item_number.ilike(f"%{search}%"))
         )
+
     if result_filter:
         items_query = items_query.filter(Item.result_status == result_filter)
+
     items = items_query.order_by(Item.item_number.asc()).all()
+
     if viability_filter:
         items = [item for item in items if item.price_status == viability_filter]
 
     suppliers_list = Supplier.query.order_by(Supplier.name.asc()).all()
     selected_quick_id = request.args.get("quick_item_id", type=int)
     selected_quick_item = None
+
     if selected_quick_id:
         selected_quick_item = next((item for item in items if item.id == selected_quick_id), None)
+
     if not selected_quick_item and items:
         selected_quick_item = items[0]
 
@@ -407,11 +464,30 @@ def tender_detail(tender_id: int):
 @login_required
 def update_tender(tender_id: int):
     tender = Tender.query.get_or_404(tender_id)
-    tender.edital_number = request.form.get("edital_number", tender.edital_number).strip()
-    tender.dispute_date = datetime.strptime(request.form.get("dispute_date"), "%Y-%m-%d").date()
+
+    edital_number = request.form.get("edital_number", tender.edital_number).strip()
+    dispute_date_str = request.form.get("dispute_date", "").strip()
+
+    if not edital_number:
+        flash("Informe o número do edital.", "warning")
+        return redirect(url_for("tender_detail", tender_id=tender.id))
+
+    if not dispute_date_str:
+        flash("Informe a data da disputa.", "warning")
+        return redirect(url_for("tender_detail", tender_id=tender.id))
+
+    try:
+        dispute_date = datetime.strptime(dispute_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        flash("Data da disputa inválida.", "danger")
+        return redirect(url_for("tender_detail", tender_id=tender.id))
+
+    tender.edital_number = edital_number
+    tender.dispute_date = dispute_date
     tender.status = request.form.get("status", tender.status)
     tender.notes = request.form.get("notes", tender.notes)
     tender.won_notes = request.form.get("won_notes", tender.won_notes)
+
     if tender.status == "ganha":
         tender.won_followup_status = request.form.get(
             "won_followup_status",
@@ -419,6 +495,7 @@ def update_tender(tender_id: int):
         )
     else:
         tender.won_followup_status = ""
+
     db.session.commit()
     flash("Licitação atualizada.", "success")
     return redirect(url_for("tender_detail", tender_id=tender.id))
@@ -437,14 +514,24 @@ def delete_tender(tender_id: int):
 @app.route("/tenders/delete", methods=["POST"])
 @login_required
 def bulk_delete_tenders():
-    ids = request.form.getlist("tender_ids")
-    if not ids:
+    raw_ids = request.form.getlist("tender_ids")
+
+    if not raw_ids:
         flash("Selecione ao menos uma licitação para excluir.", "warning")
         return redirect(url_for("tenders"))
+
+    try:
+        ids = [int(i) for i in raw_ids if i and i.strip()]
+    except ValueError:
+        flash("Há IDs inválidos na seleção.", "danger")
+        return redirect(url_for("tenders"))
+
     tenders_to_delete = Tender.query.filter(Tender.id.in_(ids)).all()
     count = len(tenders_to_delete)
+
     for tender in tenders_to_delete:
         db.session.delete(tender)
+
     db.session.commit()
     flash(f"{count} licitação(ões) excluída(s).", "success")
     return redirect(url_for("tenders"))
@@ -481,6 +568,7 @@ def update_won_tender(tender_id: int):
 def upload_attachment(tender_id: int):
     tender = Tender.query.get_or_404(tender_id)
     file = request.files.get("attachment")
+
     if not file or not file.filename:
         flash("Selecione um arquivo para anexar.", "warning")
         return redirect(url_for("tender_detail", tender_id=tender.id))
@@ -489,9 +577,11 @@ def upload_attachment(tender_id: int):
     safe = secure_filename(file.filename)
     saved_name = f"{timestamp}_{safe}"
     file.save(UPLOAD_DIR / saved_name)
+
     att = Attachment(tender_id=tender.id, original_name=file.filename, file_name=saved_name)
     db.session.add(att)
     db.session.commit()
+
     flash("Arquivo anexado com sucesso.", "success")
     return redirect(url_for("tender_detail", tender_id=tender.id))
 
@@ -500,15 +590,30 @@ def upload_attachment(tender_id: int):
 @login_required
 def update_item(item_id: int):
     item = Item.query.get_or_404(item_id)
-    item.supplier_id = request.form.get("supplier_id") or None
-    item.item_number = request.form.get("item_number", item.item_number).strip()
-    item.description = request.form.get("description", item.description).strip()
-    item.quantity = float(request.form.get("quantity") or item.quantity)
-    item.reference_value = float(request.form.get("reference_value") or item.reference_value)
-    item.price_found = float(request.form.get("price_found") or 0)
+
+    supplier_id_raw = request.form.get("supplier_id", "").strip()
+    item.supplier_id = parse_int(supplier_id_raw, None)
+
+    item_number = request.form.get("item_number", item.item_number).strip()
+    description = request.form.get("description", item.description).strip()
+
+    if not item_number:
+        flash("Informe o número do item.", "warning")
+        return redirect(url_for("tender_detail", tender_id=item.tender_id, quick_item_id=item.id))
+
+    if not description:
+        flash("Informe a descrição do item.", "warning")
+        return redirect(url_for("tender_detail", tender_id=item.tender_id, quick_item_id=item.id))
+
+    item.item_number = item_number
+    item.description = description
+    item.quantity = parse_float(request.form.get("quantity"), item.quantity)
+    item.reference_value = parse_float(request.form.get("reference_value"), item.reference_value)
+    item.price_found = parse_float(request.form.get("price_found"), 0)
     item.result_status = request.form.get("result_status", item.result_status)
     item.product_link = request.form.get("product_link", item.product_link).strip()
     item.quick_notes = request.form.get("quick_notes", item.quick_notes).strip()
+
     db.session.commit()
     flash("Item atualizado.", "success")
     return redirect(url_for("tender_detail", tender_id=item.tender_id, quick_item_id=item.id))
@@ -551,14 +656,24 @@ def delete_item(item_id: int):
 @login_required
 def bulk_delete_items(tender_id: int):
     tender = Tender.query.get_or_404(tender_id)
-    ids = request.form.getlist("item_ids")
-    if not ids:
+    raw_ids = request.form.getlist("item_ids")
+
+    if not raw_ids:
         flash("Selecione ao menos um item para excluir.", "warning")
         return redirect(url_for("tender_detail", tender_id=tender.id))
+
+    try:
+        ids = [int(i) for i in raw_ids if i and i.strip()]
+    except ValueError:
+        flash("Há IDs inválidos na seleção dos itens.", "danger")
+        return redirect(url_for("tender_detail", tender_id=tender.id))
+
     items = Item.query.filter(Item.tender_id == tender.id, Item.id.in_(ids)).all()
     count = len(items)
+
     for item in items:
         db.session.delete(item)
+
     db.session.commit()
     flash(f"{count} item(ns) excluído(s).", "success")
     return redirect(url_for("tender_detail", tender_id=tender.id))
@@ -568,14 +683,17 @@ def bulk_delete_items(tender_id: int):
 @login_required
 def register_bid(item_id: int):
     item = Item.query.get_or_404(item_id)
-    bid_value = float(request.form.get("bid_value") or 0)
+    bid_value = parse_float(request.form.get("bid_value"), 0)
     note = request.form.get("note", "").strip()
+
     item.last_bid = bid_value
     history = BidHistory(item_id=item.id, bid_value=bid_value, note=note)
     db.session.add(history)
     db.session.commit()
+
     flash(f"Lance {currency(bid_value)} registrado.", "success")
     origin = request.form.get("origin", "detail")
+
     if origin == "pregao":
         return redirect(url_for("pregao_mode", tender_id=item.tender_id, item_id=item.id))
     if origin == "quick":
@@ -588,10 +706,14 @@ def register_bid(item_id: int):
 def set_item_result(item_id: int):
     item = Item.query.get_or_404(item_id)
     item.result_status = request.form.get("result_status", item.result_status)
-    item.final_value = float(request.form.get("final_value")) if request.form.get("final_value") else item.last_bid
+
+    final_value_raw = request.form.get("final_value")
+    item.final_value = parse_float(final_value_raw, item.last_bid or 0) if final_value_raw else item.last_bid
+
     if item.result_status == "ganho":
         item.tender.status = "ganha"
         normalize_won_status(item.tender)
+
     db.session.commit()
     flash("Resultado do item atualizado.", "success")
     return redirect(url_for("pregao_mode", tender_id=item.tender_id, item_id=item.id))
@@ -604,10 +726,12 @@ def pregao_mode(tender_id: int):
     item_id = request.args.get("item_id", type=int)
     selected_item = None
     items = Item.query.filter_by(tender_id=tender.id).order_by(Item.item_number.asc()).all()
+
     if item_id:
         selected_item = Item.query.filter_by(tender_id=tender.id, id=item_id).first()
     if not selected_item and items:
         selected_item = items[0]
+
     return render_template("pregao.html", tender=tender, items=items, selected_item=selected_item)
 
 
@@ -618,10 +742,12 @@ def quick_mode(tender_id: int):
     item_id = request.args.get("item_id", type=int)
     items = Item.query.filter_by(tender_id=tender.id).order_by(Item.item_number.asc()).all()
     selected_item = None
+
     if item_id:
         selected_item = Item.query.filter_by(tender_id=tender.id, id=item_id).first()
     if not selected_item and items:
         selected_item = items[0]
+
     return render_template("quick_mode.html", tender=tender, items=items, selected_item=selected_item)
 
 
@@ -629,16 +755,23 @@ def quick_mode(tender_id: int):
 @login_required
 def suppliers():
     if request.method == "POST":
+        name = request.form.get("name", "").strip()
+
+        if not name:
+            flash("Informe o nome do fornecedor.", "warning")
+            return redirect(url_for("suppliers"))
+
         supplier = Supplier(
-            name=request.form.get("name", "").strip(),
+            name=name,
             product_link=request.form.get("product_link", "").strip(),
-            price_found=float(request.form.get("price_found") or 0),
+            price_found=parse_float(request.form.get("price_found"), 0),
             notes=request.form.get("notes", "").strip(),
         )
         db.session.add(supplier)
         db.session.commit()
         flash("Fornecedor cadastrado.", "success")
         return redirect(url_for("suppliers"))
+
     search = request.args.get("search", "").strip()
     query = Supplier.query
     if search:
@@ -675,6 +808,7 @@ def export_tender_csv(tender_id: int):
         "Link",
         "Observações",
     ])
+
     for item in tender.items:
         writer.writerow([
             item.item_number,
@@ -690,8 +824,10 @@ def export_tender_csv(tender_id: int):
             item.product_link,
             item.quick_notes,
         ])
+
     mem = io.BytesIO(output.getvalue().encode("utf-8-sig"))
     mem.seek(0)
+
     return send_file(
         mem,
         as_attachment=True,
@@ -714,9 +850,11 @@ def backup_data():
         db_path = BASE_DIR / "licitacoes.db"
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_file = BACKUP_DIR / f"licitacoes_backup_{timestamp}.db"
+
         if db_path.exists():
             shutil.copy2(db_path, backup_file)
             return send_file(backup_file, as_attachment=True, download_name=backup_file.name)
+
         flash("Banco de dados ainda não encontrado.", "warning")
         return redirect(url_for("dashboard"))
 
